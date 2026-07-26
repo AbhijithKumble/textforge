@@ -14,6 +14,10 @@ Instead, it focuses on something different:
 
 TextForge is designed to teach **how developers actually use regex at work**, not just how regex syntax works.
 
+## Get Started
+
+See [INSTALL.md](INSTALL.md) for cloning the project, starting the lessons, practicing exercises, and managing saved progress.
+
 
 # 🗺️ TextForge Roadmap
 
@@ -382,4 +386,3 @@ Every feature should help answer one question:
 If the answer is **yes**, it belongs in TextForge.
 
 If not, it should probably wait.
-

@@ -26,17 +26,32 @@ var learnCmd = &cobra.Command{
 			return err
 		}
 		if len(args) == 0 {
-			fmt.Println("Lessons:")
-			for _, lesson := range lessons {
-				fmt.Printf("  %-24s %s (%s)\n", lesson.ID, lesson.Title, lesson.Difficulty)
+			out := cmd.OutOrStdout()
+			fmt.Fprintln(out, "TextForge Learning")
+			fmt.Fprintln(out, "=================")
+			fmt.Fprintf(out, "\n%d lessons available\n\n", len(lessons))
+			for index, lesson := range lessons {
+				fmt.Fprintf(out, "[%d] %s\n", index+1, lesson.Title)
+				fmt.Fprintf(out, "    %s · %d exercises\n", lesson.Difficulty, len(lesson.Exercises))
+				fmt.Fprintf(out, "    %s\n", lesson.Description)
+				fmt.Fprintf(out, "    ID: %s\n\n", lesson.ID)
 			}
-			fmt.Println("\nRun `textforge learn <lesson-id>` to read a lesson.")
+			fmt.Fprintln(out, "Start learning:")
+			fmt.Fprintln(out, "  textforge learn <lesson-id>")
+			fmt.Fprintln(out, "  textforge practice <lesson-id>")
 			return nil
 		}
 
 		for _, lesson := range lessons {
 			if lesson.ID == args[0] {
-				fmt.Printf("# %s\n\n%s\n", lesson.Title, strings.TrimSpace(lesson.Content))
+				out := cmd.OutOrStdout()
+				fmt.Fprintf(out, "Lesson %d · %s\n", lesson.Index, lesson.Title)
+				fmt.Fprintf(out, "%s · %d exercises\n", lesson.Difficulty, len(lesson.Exercises))
+				fmt.Fprintln(out, "────────────────────────────────────────")
+				fmt.Fprintf(out, "\n%s\n\n", lesson.Description)
+				fmt.Fprintln(out, strings.TrimSpace(lesson.Content))
+				fmt.Fprintln(out, "\n────────────────────────────────────────")
+				fmt.Fprintf(out, "Ready to practice?  textforge practice %s\n", lesson.ID)
 				return nil
 			}
 		}
