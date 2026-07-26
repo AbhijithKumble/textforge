@@ -8,12 +8,15 @@ exercises:
   - id: timeout
     prompt: "Find the word timeout in a configuration file."
     answer: "timeout"
+    test_input: "timeout=30 retries=3"
   - id: status-ok
     prompt: "Find the exact text status=ok in a service log."
     answer: "status=ok"
+    test_input: "status=ok status=error"
   - id: error
     prompt: "Find ERROR without matching lowercase error."
     answer: "ERROR"
+    test_input: "ERROR error"
 ---
 
 # Regex Literals

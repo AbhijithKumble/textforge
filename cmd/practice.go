@@ -56,15 +56,21 @@ var practiceCmd = &cobra.Command{
 			}
 
 			lessonCount++
-			fmt.Fprintf(cmd.OutOrStdout(), "\n=== Lesson %d: %s ===\n\n%s\n\n", lesson.Index, lesson.Title, strings.TrimSpace(lesson.Content))
-			for _, exercise := range lesson.Exercises {
+			fmt.Fprintf(cmd.OutOrStdout(), "\nLesson %d/%d: %s\n", lessonIndex+1, len(lessons), lesson.Title)
+			fmt.Fprintln(cmd.OutOrStdout(), "────────────────────────────────────────")
+
+			for exerciseIndex, exercise := range lesson.Exercises {
 				progressID := lesson.ID + "/" + exercise.ID
 				if store.IsComplete(progressID) {
 					continue
 				}
 
 				for {
-					fmt.Fprintf(cmd.OutOrStdout(), "Exercise: %s\n%s\nYour answer (or q to quit): ", exercise.ID, exercise.Prompt)
+					fmt.Fprintf(cmd.OutOrStdout(), "\nExercise %d/%d\n%s\n", exerciseIndex+1, len(lesson.Exercises), exercise.Prompt)
+					if exercise.TestInput != "" {
+						fmt.Fprintf(cmd.OutOrStdout(), "\nTest input:\n  %s\n", exercise.TestInput)
+					}
+					fmt.Fprint(cmd.OutOrStdout(), "\nEnter a regex (or q to quit): ")
 					answer, err := readAnswer(reader)
 					if err != nil {
 						if err == io.EOF {
@@ -100,7 +106,7 @@ var practiceCmd = &cobra.Command{
 
 			fmt.Fprintf(cmd.OutOrStdout(), "Lesson complete: %s!\n", lesson.Title)
 			if nextLessonExists(lessons, lessonIndex, args, store) {
-				fmt.Fprintln(cmd.OutOrStdout(), "Continue to the next lesson? [n]ext/[q]uit")
+				fmt.Fprint(cmd.OutOrStdout(), "Press Enter for the next lesson, or q to quit: ")
 				choice, err := readAnswer(reader)
 				if err != nil || strings.EqualFold(strings.TrimSpace(choice), "q") || strings.EqualFold(strings.TrimSpace(choice), "quit") {
 					fmt.Fprintln(cmd.OutOrStdout(), "Great work! See you next time.")
