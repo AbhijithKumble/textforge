@@ -21,9 +21,10 @@ type Lesson struct {
 }
 
 type Exercise struct {
-	ID     string `yaml:"id"`
-	Prompt string `yaml:"prompt"`
-	Answer string `yaml:"answer"`
+	ID        string `yaml:"id"`
+	Prompt    string `yaml:"prompt"`
+	Answer    string `yaml:"answer"`
+	TestInput string `yaml:"test_input"`
 }
 
 func LoadLesson(filePath string) (*Lesson, error) {

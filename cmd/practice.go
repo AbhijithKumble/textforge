@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 
 	"github.com/AbhijithKumble/textforge/internal/course"
@@ -76,11 +77,17 @@ var practiceCmd = &cobra.Command{
 						fmt.Fprintln(cmd.OutOrStdout(), "Leaving practice. Your saved progress is kept.")
 						return nil
 					}
-					if answer != exercise.Answer {
+					if !validAnswer(answer, exercise) {
 						fmt.Fprintln(cmd.OutOrStdout(), "Not quite. Try again.")
+						if exercise.TestInput != "" {
+							printRegexFeedback(cmd.OutOrStdout(), answer, exercise)
+						}
 						continue
 					}
 
+					if exercise.TestInput != "" {
+						printRegexSelection(cmd.OutOrStdout(), answer, exercise.TestInput)
+					}
 					store.Complete(progressID)
 					if err := store.Save(progressFile); err != nil {
 						return err
@@ -113,6 +120,57 @@ var practiceCmd = &cobra.Command{
 		}
 		return nil
 	},
+}
+
+// validAnswer compares regex behavior when an exercise provides test input.
+// Exercises without test input retain exact-answer validation for non-regex
+// lessons and answers that are not intended to be interpreted as patterns.
+func validAnswer(answer string, exercise course.Exercise) bool {
+	if exercise.TestInput == "" {
+		return answer == exercise.Answer
+	}
+
+	expected, err := regexOutput(exercise.Answer, exercise.TestInput)
+	if err != nil {
+		return false
+	}
+	candidate, err := regexOutput(answer, exercise.TestInput)
+	if err != nil {
+		return false
+	}
+
+	return strings.Join(expected, "\x00") == strings.Join(candidate, "\x00")
+}
+
+func regexOutput(pattern, input string) ([]string, error) {
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil, err
+	}
+	return re.FindAllString(input, -1), nil
+}
+
+func printRegexFeedback(out io.Writer, answer string, exercise course.Exercise) {
+	selected, err := regexOutput(answer, exercise.TestInput)
+	if err != nil {
+		fmt.Fprintf(out, "Your regex is invalid: %v\n", err)
+		return
+	}
+
+	expected, err := regexOutput(exercise.Answer, exercise.TestInput)
+	if err != nil {
+		return
+	}
+	fmt.Fprintf(out, "Your regex selected: %q\n", selected)
+	fmt.Fprintf(out, "Expected selection: %q\n", expected)
+}
+
+func printRegexSelection(out io.Writer, pattern, input string) {
+	selected, err := regexOutput(pattern, input)
+	if err != nil {
+		return
+	}
+	fmt.Fprintf(out, "Valid characters selected: %q\n", selected)
 }
 
 func readAnswer(reader *bufio.Reader) (string, error) {
