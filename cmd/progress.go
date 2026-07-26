@@ -6,6 +6,7 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/AbhijithKumble/textforge/internal/progress"
 	"github.com/spf13/cobra"
 )
 
@@ -17,8 +18,37 @@ var progressCmd = &cobra.Command{
 
     Shows a breakdown of your progress across different courses (Regex, grep, sed, etc.)
     and helps you resume exactly where you left off.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("progress called")
+	RunE: func(cmd *cobra.Command, args []string) error {
+		lessons, err := loadLessons()
+		if err != nil {
+			return err
+		}
+		store, err := progress.Load(progressFile)
+		if err != nil {
+			return err
+		}
+
+		completed, total := 0, 0
+		for _, lesson := range lessons {
+			for _, exercise := range lesson.Exercises {
+				total++
+				if store.IsComplete(lesson.ID + "/" + exercise.ID) {
+					completed++
+				}
+			}
+		}
+
+		fmt.Fprintf(cmd.OutOrStdout(), "Progress: %d/%d exercises complete\n", completed, total)
+		for _, lesson := range lessons {
+			lessonCompleted := 0
+			for _, exercise := range lesson.Exercises {
+				if store.IsComplete(lesson.ID + "/" + exercise.ID) {
+					lessonCompleted++
+				}
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "  %-24s %d/%d\n", lesson.ID, lessonCompleted, len(lesson.Exercises))
+		}
+		return nil
 	},
 }
 

@@ -5,6 +5,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -18,8 +19,28 @@ var learnCmd = &cobra.Command{
     This command loads structured lessons from the courses directory, explains
     concepts in detail, and lets you navigate step-by-step through topics like
     regex literals, character classes, and shell pipelines.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("learn called")
+	Args: cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		lessons, err := loadLessons()
+		if err != nil {
+			return err
+		}
+		if len(args) == 0 {
+			fmt.Println("Lessons:")
+			for _, lesson := range lessons {
+				fmt.Printf("  %-24s %s (%s)\n", lesson.ID, lesson.Title, lesson.Difficulty)
+			}
+			fmt.Println("\nRun `textforge learn <lesson-id>` to read a lesson.")
+			return nil
+		}
+
+		for _, lesson := range lessons {
+			if lesson.ID == args[0] {
+				fmt.Printf("# %s\n\n%s\n", lesson.Title, strings.TrimSpace(lesson.Content))
+				return nil
+			}
+		}
+		return fmt.Errorf("lesson %q not found", args[0])
 	},
 }
 

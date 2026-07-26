@@ -1,12 +1,16 @@
 /*
 Copyright © 2026 NAME HERE <EMAIL ADDRESS>
-
 */
 package cmd
 
 import (
+	"bufio"
 	"fmt"
+	"io"
+	"strings"
 
+	"github.com/AbhijithKumble/textforge/internal/course"
+	"github.com/AbhijithKumble/textforge/internal/progress"
 	"github.com/spf13/cobra"
 )
 
@@ -19,9 +23,118 @@ var practiceCmd = &cobra.Command{
     You will be presented with real-world problems and data. Work on the exercises
     locally, and TextForge will automatically validate your solutions against
     hidden test cases, providing immediate feedback and hints when you're stuck.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("practice called")
+	Args: cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		lessons, err := loadLessons()
+		if err != nil {
+			return err
+		}
+		store, err := progress.Load(progressFile)
+		if err != nil {
+			return err
+		}
+
+		reader := bufio.NewReader(cmd.InOrStdin())
+		lessonCount := 0
+		for lessonIndex, lesson := range lessons {
+			if len(args) == 1 && lesson.ID != args[0] {
+				continue
+			}
+
+			unfinished := false
+			for _, exercise := range lesson.Exercises {
+				progressID := lesson.ID + "/" + exercise.ID
+				if store.IsComplete(progressID) {
+					continue
+				}
+				unfinished = true
+				break
+			}
+			if !unfinished {
+				continue
+			}
+
+			lessonCount++
+			fmt.Fprintf(cmd.OutOrStdout(), "\n=== Lesson %d: %s ===\n\n%s\n\n", lesson.Index, lesson.Title, strings.TrimSpace(lesson.Content))
+			for _, exercise := range lesson.Exercises {
+				progressID := lesson.ID + "/" + exercise.ID
+				if store.IsComplete(progressID) {
+					continue
+				}
+
+				for {
+					fmt.Fprintf(cmd.OutOrStdout(), "Exercise: %s\n%s\nYour answer (or q to quit): ", exercise.ID, exercise.Prompt)
+					answer, err := readAnswer(reader)
+					if err != nil {
+						if err == io.EOF {
+							return nil
+						}
+						return fmt.Errorf("read answer: %w", err)
+					}
+					answer = strings.TrimSpace(answer)
+					if strings.EqualFold(answer, "q") || strings.EqualFold(answer, "quit") {
+						fmt.Fprintln(cmd.OutOrStdout(), "Leaving practice. Your saved progress is kept.")
+						return nil
+					}
+					if answer != exercise.Answer {
+						fmt.Fprintln(cmd.OutOrStdout(), "Not quite. Try again.")
+						continue
+					}
+
+					store.Complete(progressID)
+					if err := store.Save(progressFile); err != nil {
+						return err
+					}
+					fmt.Fprintln(cmd.OutOrStdout(), "Correct! Progress saved.")
+					fmt.Fprintln(cmd.OutOrStdout())
+					break
+				}
+			}
+
+			fmt.Fprintf(cmd.OutOrStdout(), "Lesson complete: %s!\n", lesson.Title)
+			if nextLessonExists(lessons, lessonIndex, args, store) {
+				fmt.Fprintln(cmd.OutOrStdout(), "Continue to the next lesson? [n]ext/[q]uit")
+				choice, err := readAnswer(reader)
+				if err != nil || strings.EqualFold(strings.TrimSpace(choice), "q") || strings.EqualFold(strings.TrimSpace(choice), "quit") {
+					fmt.Fprintln(cmd.OutOrStdout(), "Great work! See you next time.")
+					return nil
+				}
+			}
+		}
+
+		if len(args) == 1 {
+			if lessonCount == 0 {
+				return fmt.Errorf("no unfinished exercises found for lesson %q", args[0])
+			}
+			return nil
+		}
+		if lessonCount == 0 {
+			fmt.Fprintln(cmd.OutOrStdout(), "All lessons are complete. Great work!")
+		}
+		return nil
 	},
+}
+
+func readAnswer(reader *bufio.Reader) (string, error) {
+	answer, err := reader.ReadString('\n')
+	if err != nil && len(answer) == 0 {
+		return "", err
+	}
+	return answer, nil
+}
+
+func nextLessonExists(lessons []*course.Lesson, current int, args []string, store *progress.Store) bool {
+	for i := current + 1; i < len(lessons); i++ {
+		if len(args) == 1 && lessons[i].ID != args[0] {
+			continue
+		}
+		for _, exercise := range lessons[i].Exercises {
+			if !store.IsComplete(lessons[i].ID + "/" + exercise.ID) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func init() {

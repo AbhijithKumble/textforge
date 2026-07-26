@@ -4,8 +4,10 @@ Copyright © 2026 NAME HERE abhijith18765@gmail.com
 package cmd
 
 import (
+	"fmt"
 	"os"
 
+	"github.com/AbhijithKumble/textforge/internal/course"
 	"github.com/spf13/cobra"
 )
 
@@ -20,6 +22,9 @@ Instead of memorizing syntax in isolation, TextForge guides you through
 solving realistic developer tasks—like parsing logs, formatting CSVs, and
 manipulating config files—using tools like Regex, grep, sed, awk, and jq.`,
 }
+
+var coursesDir string
+var progressFile string
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
@@ -39,5 +44,17 @@ func init() {
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	rootCmd.PersistentFlags().StringVar(&coursesDir, "courses", "courses", "directory containing lesson files")
+	rootCmd.PersistentFlags().StringVar(&progressFile, "progress", ".textforge/progress.json", "file used to save progress")
+}
+
+func loadLessons() ([]*course.Lesson, error) {
+	lessons, err := course.DiscoverLessons(coursesDir)
+	if err != nil {
+		return nil, fmt.Errorf("load lessons: %w", err)
+	}
+	if len(lessons) == 0 {
+		return nil, fmt.Errorf("no lessons found in %q", coursesDir)
+	}
+	return lessons, nil
 }
