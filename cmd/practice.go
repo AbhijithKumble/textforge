@@ -15,6 +15,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	redText   = "\033[31m"
+	greenText = "\033[32m"
+	resetText = "\033[0m"
+)
+
 // practiceCmd represents the practice command
 var practiceCmd = &cobra.Command{
 	Use:   "practice",
@@ -68,7 +74,10 @@ var practiceCmd = &cobra.Command{
 				for {
 					fmt.Fprintf(cmd.OutOrStdout(), "\nExercise %d/%d\n%s\n", exerciseIndex+1, len(lesson.Exercises), exercise.Prompt)
 					if exercise.TestInput != "" {
-						fmt.Fprintf(cmd.OutOrStdout(), "\nTest input:\n  %s\n", exercise.TestInput)
+						fmt.Fprintln(cmd.OutOrStdout(), "\nTest input:")
+						for _, line := range strings.Split(exercise.TestInput, "\n") {
+							fmt.Fprintf(cmd.OutOrStdout(), "  %s\n", line)
+						}
 					}
 					fmt.Fprint(cmd.OutOrStdout(), "\nEnter a regex (or q to quit): ")
 					answer, err := readAnswer(reader)
@@ -153,7 +162,14 @@ func regexOutput(pattern, input string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return re.FindAllString(input, -1), nil
+
+	// grep evaluates patterns one line at a time, so process multiline test
+	// input line-by-line to give ^ and $ the expected behavior.
+	var matches []string
+	for _, line := range strings.Split(input, "\n") {
+		matches = append(matches, re.FindAllString(line, -1)...)
+	}
+	return matches, nil
 }
 
 func printRegexFeedback(out io.Writer, answer string, exercise course.Exercise) {
@@ -167,8 +183,29 @@ func printRegexFeedback(out io.Writer, answer string, exercise course.Exercise) 
 	if err != nil {
 		return
 	}
-	fmt.Fprintf(out, "Your regex selected: %q\n", selected)
-	fmt.Fprintf(out, "Expected selection: %q\n", expected)
+	selectedInput, err := highlightRegex(answer, exercise.TestInput)
+	if err != nil {
+		return
+	}
+	expectedInput, err := highlightRegexColor(exercise.Answer, exercise.TestInput, greenText)
+	if err != nil {
+		return
+	}
+	fmt.Fprintln(out, "\nYOUR RESULT")
+	fmt.Fprintf(out, "  Pattern: %s\n", answer)
+	fmt.Fprintf(out, "  Matches found: %d %s\n", len(selected), formatMatches(selected))
+	if len(selected) == 0 {
+		fmt.Fprintln(out, "  Matched input: (none)")
+	} else {
+		fmt.Fprintln(out, "  Matched input (red):")
+		printIndented(out, selectedInput)
+	}
+	fmt.Fprintln(out, "\nEXPECTED RESULT")
+	fmt.Fprintf(out, "  Pattern: %s\n", exercise.Answer)
+	fmt.Fprintf(out, "  Matches expected: %d %s\n", len(expected), formatMatches(expected))
+	fmt.Fprintln(out, "  Expected input (green):")
+	printIndented(out, expectedInput)
+	fmt.Fprintf(out, "\n  Difference: your regex found %d match(es); %d expected.\n", len(selected), len(expected))
 }
 
 func printRegexSelection(out io.Writer, pattern, input string) {
@@ -176,7 +213,58 @@ func printRegexSelection(out io.Writer, pattern, input string) {
 	if err != nil {
 		return
 	}
+	highlighted, err := highlightRegex(pattern, input)
+	if err != nil {
+		return
+	}
+	fmt.Fprintln(out, "Matches (red):")
+	printIndented(out, highlighted)
 	fmt.Fprintf(out, "Valid characters selected: %q\n", selected)
+}
+
+func formatMatches(matches []string) string {
+	if len(matches) == 0 {
+		return "(none)"
+	}
+	return fmt.Sprintf("%q", matches)
+}
+
+func printIndented(out io.Writer, text string) {
+	for _, line := range strings.Split(text, "\n") {
+		fmt.Fprintf(out, "  %s\n", line)
+	}
+}
+
+func highlightRegex(pattern, input string) (string, error) {
+	return highlightRegexColor(pattern, input, redText)
+}
+
+func highlightRegexColor(pattern, input, color string) (string, error) {
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return "", err
+	}
+
+	lines := strings.Split(input, "\n")
+	for lineIndex, line := range lines {
+		indices := re.FindAllStringIndex(line, -1)
+		if len(indices) == 0 {
+			continue
+		}
+
+		var highlighted strings.Builder
+		cursor := 0
+		for _, match := range indices {
+			highlighted.WriteString(line[cursor:match[0]])
+			highlighted.WriteString(color)
+			highlighted.WriteString(line[match[0]:match[1]])
+			highlighted.WriteString(resetText)
+			cursor = match[1]
+		}
+		highlighted.WriteString(line[cursor:])
+		lines[lineIndex] = highlighted.String()
+	}
+	return strings.Join(lines, "\n"), nil
 }
 
 func readAnswer(reader *bufio.Reader) (string, error) {

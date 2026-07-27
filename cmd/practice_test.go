@@ -41,7 +41,7 @@ func TestValidAnswerRejectsInvalidRegex(t *testing.T) {
 	}
 }
 
-func TestPrintRegexFeedbackShowsSelections(t *testing.T) {
+func TestPrintRegexFeedbackShowsSeparateResults(t *testing.T) {
 	exercise := course.Exercise{
 		Answer:    "[A-Fa-f0-9]",
 		TestInput: "A f 7 G z 0 9",
@@ -49,10 +49,21 @@ func TestPrintRegexFeedbackShowsSelections(t *testing.T) {
 	var output bytes.Buffer
 
 	printRegexFeedback(&output, "[A-Z]", exercise)
-
-	want := "Your regex selected: [\"A\" \"G\"]\nExpected selection: [\"A\" \"f\" \"7\" \"0\" \"9\"]\n"
-	if output.String() != want {
-		t.Fatalf("feedback = %q, want %q", output.String(), want)
+	feedback := output.String()
+	for _, want := range []string{
+		"YOUR RESULT",
+		"Pattern: [A-Z]",
+		"Matches found: 2 [\"A\" \"G\"]",
+		"EXPECTED RESULT",
+		"Pattern: [A-Fa-f0-9]",
+		"Matches expected: 5 [\"A\" \"f\" \"7\" \"0\" \"9\"]",
+		"Difference: your regex found 2 match(es); 5 expected.",
+		redText + "A" + resetText,
+		greenText + "f" + resetText,
+	} {
+		if !strings.Contains(feedback, want) {
+			t.Errorf("feedback %q does not contain %q", feedback, want)
+		}
 	}
 }
 
@@ -72,8 +83,21 @@ func TestPrintRegexSelectionShowsValidCharacters(t *testing.T) {
 
 	printRegexSelection(&output, "[A-Fa-f0-9]", "A f 7 G z 0 9")
 
-	want := "Valid characters selected: [\"A\" \"f\" \"7\" \"0\" \"9\"]\n"
-	if output.String() != want {
-		t.Fatalf("selection = %q, want %q", output.String(), want)
+	if !strings.Contains(output.String(), "Valid characters selected: [\"A\" \"f\" \"7\" \"0\" \"9\"]") {
+		t.Fatalf("selection = %q, want selected-character output", output.String())
+	}
+	if !strings.Contains(output.String(), redText+"A"+resetText) {
+		t.Fatalf("selection = %q, want red match", output.String())
+	}
+}
+
+func TestRegexOutputTreatsAnchorsAsLineAnchors(t *testing.T) {
+	got, err := regexOutput("^ERROR", "ERROR disk full\nINFO ERROR disk full")
+	if err != nil {
+		t.Fatalf("regexOutput() returned an error: %v", err)
+	}
+
+	if len(got) != 1 || got[0] != "ERROR" {
+		t.Fatalf("matches = %q, want [\"ERROR\"]", got)
 	}
 }
