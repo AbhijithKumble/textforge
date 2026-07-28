@@ -16,7 +16,7 @@ TextForge is designed to teach **how developers actually use regex at work**, no
 
 ## Get Started
 
-See [INSTALL.md](INSTALL.md) for cloning the project, starting the lessons, practicing exercises, and managing saved progress.
+See [INSTALL.md](INSTALL.md) for cloning the project, starting the lessons, practicing exercises, and managing saved progress. Continuing contributors can read [CONTRIBUTING.md](CONTRIBUTING.md) and [LLM_HANDOFF.md](LLM_HANDOFF.md).
 
 
 # 🗺️ TextForge Roadmap

@@ -25,6 +25,7 @@ type Exercise struct {
 	Prompt    string `yaml:"prompt"`
 	Answer    string `yaml:"answer"`
 	TestInput string `yaml:"test_input"`
+	Captures  bool   `yaml:"captures"`
 }
 
 func LoadLesson(filePath string) (*Lesson, error) {

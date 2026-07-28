@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"reflect"
 	"regexp"
 	"strings"
 
@@ -101,7 +102,11 @@ var practiceCmd = &cobra.Command{
 					}
 
 					if exercise.TestInput != "" {
-						printRegexSelection(cmd.OutOrStdout(), answer, exercise.TestInput)
+						if exercise.Captures {
+							printCaptureSelection(cmd.OutOrStdout(), answer, exercise.TestInput)
+						} else {
+							printRegexSelection(cmd.OutOrStdout(), answer, exercise.TestInput)
+						}
 					}
 					store.Complete(progressID)
 					if err := store.Save(progressFile); err != nil {
@@ -145,6 +150,18 @@ func validAnswer(answer string, exercise course.Exercise) bool {
 		return answer == exercise.Answer
 	}
 
+	if exercise.Captures {
+		expected, err := regexSubmatches(exercise.Answer, exercise.TestInput)
+		if err != nil {
+			return false
+		}
+		candidate, err := regexSubmatches(answer, exercise.TestInput)
+		if err != nil {
+			return false
+		}
+		return reflect.DeepEqual(expected, candidate)
+	}
+
 	expected, err := regexOutput(exercise.Answer, exercise.TestInput)
 	if err != nil {
 		return false
@@ -155,6 +172,19 @@ func validAnswer(answer string, exercise course.Exercise) bool {
 	}
 
 	return strings.Join(expected, "\x00") == strings.Join(candidate, "\x00")
+}
+
+func regexSubmatches(pattern, input string) ([][]string, error) {
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil, err
+	}
+
+	var matches [][]string
+	for _, line := range strings.Split(input, "\n") {
+		matches = append(matches, re.FindAllStringSubmatch(line, -1)...)
+	}
+	return matches, nil
 }
 
 func regexOutput(pattern, input string) ([]string, error) {
@@ -173,6 +203,11 @@ func regexOutput(pattern, input string) ([]string, error) {
 }
 
 func printRegexFeedback(out io.Writer, answer string, exercise course.Exercise) {
+	if exercise.Captures {
+		printCaptureFeedback(out, answer, exercise)
+		return
+	}
+
 	selected, err := regexOutput(answer, exercise.TestInput)
 	if err != nil {
 		fmt.Fprintf(out, "Your regex is invalid: %v\n", err)
@@ -201,11 +236,56 @@ func printRegexFeedback(out io.Writer, answer string, exercise course.Exercise) 
 		printIndented(out, selectedInput)
 	}
 	fmt.Fprintln(out, "\nEXPECTED RESULT")
-	fmt.Fprintf(out, "  Pattern: %s\n", exercise.Answer)
 	fmt.Fprintf(out, "  Matches expected: %d %s\n", len(expected), formatMatches(expected))
 	fmt.Fprintln(out, "  Expected input (green):")
 	printIndented(out, expectedInput)
 	fmt.Fprintf(out, "\n  Difference: your regex found %d match(es); %d expected.\n", len(selected), len(expected))
+}
+
+func printCaptureFeedback(out io.Writer, answer string, exercise course.Exercise) {
+	actual, err := regexSubmatches(answer, exercise.TestInput)
+	if err != nil {
+		fmt.Fprintf(out, "Your regex is invalid: %v\n", err)
+		return
+	}
+	expected, err := regexSubmatches(exercise.Answer, exercise.TestInput)
+	if err != nil {
+		return
+	}
+
+	fmt.Fprintln(out, "\nYOUR RESULT")
+	fmt.Fprintf(out, "  Pattern: %s\n", answer)
+	printCaptureRows(out, "  ", actual)
+	fmt.Fprintln(out, "\nEXPECTED RESULT")
+	printCaptureRows(out, "  ", expected)
+	fmt.Fprintf(out, "\n  Difference: your regex found %d match(es); %d expected.\n", len(actual), len(expected))
+}
+
+func printCaptureRows(out io.Writer, prefix string, matches [][]string) {
+	if len(matches) == 0 {
+		fmt.Fprintf(out, "%sMatches: (none)\n", prefix)
+		return
+	}
+	fmt.Fprintf(out, "%sMatches: %d\n", prefix, len(matches))
+	for index, match := range matches {
+		fmt.Fprintf(out, "%s  Match %d: %s\n", prefix, index+1, match[0])
+		if len(match) == 1 {
+			fmt.Fprintf(out, "%s    Groups: (none)\n", prefix)
+			continue
+		}
+		for groupIndex, group := range match[1:] {
+			fmt.Fprintf(out, "%s    Group %d: %s\n", prefix, groupIndex+1, group)
+		}
+	}
+}
+
+func printCaptureSelection(out io.Writer, pattern, input string) {
+	matches, err := regexSubmatches(pattern, input)
+	if err != nil {
+		return
+	}
+	fmt.Fprintln(out, "Matches and captures:")
+	printCaptureRows(out, "  ", matches)
 }
 
 func printRegexSelection(out io.Writer, pattern, input string) {

@@ -41,6 +41,39 @@ func TestValidAnswerRejectsInvalidRegex(t *testing.T) {
 	}
 }
 
+func TestValidAnswerComparesCapturingGroups(t *testing.T) {
+	exercise := course.Exercise{
+		Answer:    "user=([A-Za-z]+)",
+		TestInput: "user=alice\nuser=bob",
+		Captures:  true,
+	}
+
+	if !validAnswer("user=([a-zA-Z]+)", exercise) {
+		t.Fatal("equivalent capture pattern should be accepted")
+	}
+	if validAnswer("user=[A-Za-z]+", exercise) {
+		t.Fatal("pattern without the expected capture group should be rejected")
+	}
+}
+
+func TestPrintCaptureSelectionShowsGroups(t *testing.T) {
+	var output bytes.Buffer
+
+	printCaptureSelection(&output, "user=([A-Za-z]+)", "user=alice\nuser=bob")
+
+	for _, want := range []string{
+		"Matches and captures:",
+		"Match 1: user=alice",
+		"Group 1: alice",
+		"Match 2: user=bob",
+		"Group 1: bob",
+	} {
+		if !strings.Contains(output.String(), want) {
+			t.Errorf("selection %q does not contain %q", output.String(), want)
+		}
+	}
+}
+
 func TestPrintRegexFeedbackShowsSeparateResults(t *testing.T) {
 	exercise := course.Exercise{
 		Answer:    "[A-Fa-f0-9]",
@@ -55,7 +88,6 @@ func TestPrintRegexFeedbackShowsSeparateResults(t *testing.T) {
 		"Pattern: [A-Z]",
 		"Matches found: 2 [\"A\" \"G\"]",
 		"EXPECTED RESULT",
-		"Pattern: [A-Fa-f0-9]",
 		"Matches expected: 5 [\"A\" \"f\" \"7\" \"0\" \"9\"]",
 		"Difference: your regex found 2 match(es); 5 expected.",
 		redText + "A" + resetText,
