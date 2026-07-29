@@ -299,14 +299,27 @@ func printRegexSelection(out io.Writer, pattern, input string) {
 	}
 	fmt.Fprintln(out, "Matches (red):")
 	printIndented(out, highlighted)
-	fmt.Fprintf(out, "Valid characters selected: %q\n", selected)
+	fmt.Fprintf(out, "Valid characters selected: %s\n", formatMatches(selected))
 }
 
 func formatMatches(matches []string) string {
 	if len(matches) == 0 {
 		return "(none)"
 	}
-	return fmt.Sprintf("%q", matches)
+	var builder strings.Builder
+	builder.WriteString("[")
+	for i, m := range matches {
+		if i > 0 {
+			builder.WriteString(" ")
+		}
+		if strings.HasPrefix(m, "\"") && strings.HasSuffix(m, "\"") && len(m) >= 2 {
+			builder.WriteString(m)
+		} else {
+			builder.WriteString(fmt.Sprintf("%q", m))
+		}
+	}
+	builder.WriteString("]")
+	return builder.String()
 }
 
 func printIndented(out io.Writer, text string) {
